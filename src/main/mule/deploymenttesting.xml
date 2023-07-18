@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:mongo="http://www.mulesoft.org/schema/mule/mongo"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/mongo http://www.mulesoft.org/schema/mule/mongo/current/mule-mongo.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<file:config name="File_Config" doc:name="File Config" doc:id="74ae51f8-8335-40e3-aef4-92d7c690fef1" >
+		<file:connection workingDir="D:\Mulesoft_project_Deployment\rfid-attendance" />
+	</file:config>
+	<flow name="deploymenttestingFlow" doc:id="30e140ed-8d69-47d0-9268-b6f219dd400a" >
+		<http:listener doc:name="Listener" doc:id="69379c2b-1451-4ad7-bc54-5af2386d56d3" config-ref="HTTP_Listener_config" path="/college" allowedMethods="GET"/>
+		<set-variable value='#[{&#10;    "studentDetails": {&#10;		"registerationId":"87654321"&#10;	},&#10;    "studentPreference": [&#10;        {&#10;            "preferredCollege": "IIT Delhi",&#10;            "collegeId": "1",&#10;            "branch": "CS"&#10;        },&#10;        {&#10;            "preferredCollege": "MNIT Jaipur",&#10;            "collegeId": "3",&#10;            "branch": "IT"&#10;        },&#10;        {&#10;            "preferredCollege": "BIT Sindri",&#10;            "collegeId": "2",&#10;            "branch": "ECE"&#10;        }&#10;    ]&#10;}]' doc:name="studentInputPayload" doc:id="077a078e-010e-4721-acc2-2ee4400f45d8" variableName="studentInputPayload"/>
+		<db:select doc:name="Select" doc:id="acc71d3c-32e9-4712-b7e2-bad1500e2a42" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT collegecutoff.collegeId,collegeName,branch,boardPercentage,generalRank,case when :category = 'SC' then scRank when :category = 'ST' then stRank when :category = 'OBC' then obcRank else null end as categoryRank from collegecutoff join college on college.collegeId = collegecutoff.collegeId where (collegecutoff.collegeId = :collegeIdPreference1 and branch = :branchPreference1) or (collegecutoff.collegeId = :collegeIdPreference2 and branch = :branchPreference2) or (collegecutoff.collegeId = :collegeIdPreference3 and branch = :branchPreference3)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'collegeIdPreference1': payload.preference."1".collegeId,
+	'collegeIdPreference2': payload.preference."2".collegeId,
+	'collegeIdPreference3': payload.preference."3".collegeId,
+	'branchPreference1': payload.preference."1".branch,
+	'branchPreference2': payload.preference."2".branch,
+	'branchPreference3': payload.preference."3".branch,
+	'category': upper(payload.category)
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="e4283322-64f2-4e87-80f1-512d7d079501" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if (vars.studentInputPayload.studentPreference.collegeId[0] as String == payload.collegeId[0] as String)
+    if((vars.studentInputPayload.studentPreference.collegeId[1] as String == payload.collegeId[1] as String) and (vars.studentInputPayload.studentPreference.collegeId[2] as String == payload.collegeId[2] as String))
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[0],
+                "preference2": payload[1],
+                "preference3": payload[2]
+
+            }
+        }
+    else 
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[0],
+                "preference2": payload[2],
+                "preference3": payload[1]
+
+            }
+        }
+else if (vars.studentInputPayload.studentPreference.collegeId[0] as String == payload.collegeId[1] as String)
+    if((vars.studentInputPayload.studentPreference.collegeId[1] as String == payload.collegeId[2] as String) and (vars.studentInputPayload.studentPreference.collegeId[2] as String == payload.collegeId[0] as String))
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[1],
+                "preference2": payload[2],
+                "preference3": payload[0]
+
+            }
+        }
+    else 
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[1],
+                "preference2": payload[0],
+                "preference3": payload[2]
+
+            }
+        }
+else
+    if((vars.studentInputPayload.studentPreference.collegeId[1] as String == payload.collegeId[1] as String) and (vars.studentInputPayload.studentPreference.collegeId[2] as String == payload.collegeId[0] as String))
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[2],
+                "preference2": payload[1],
+                "preference3": payload[0]
+
+            }
+        }
+    else 
+        {
+            "collegeCutoffs":{
+
+                "preference1": payload[2],
+                "preference2": payload[0],
+                "preference3": payload[1]
+
+            }
+        }]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:list doc:name="List" doc:id="b1aa90cf-7015-4d9a-b740-672f72235865" config-ref="File_Config">
+			<file:matcher />
+		</file:list>
+	</flow>
+</mule>
